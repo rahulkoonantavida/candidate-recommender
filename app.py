@@ -3,6 +3,9 @@ import pandas as pd
 import PyPDF2
 import re
 
+from embeddings import embed_text
+from sklearn.metrics.pairwise import cosine_similarity
+
 # ---- Page config ----
 st.set_page_config(page_title="candidate-recommender", layout="wide", initial_sidebar_state="expanded")
 
@@ -84,14 +87,24 @@ if st.sidebar.button("Run Recommendation"):
                 raw = f.read().decode("utf-8")
             texts.append(raw)
             ids.append(f.name)
+            
+        # build combined list: job_desc, then all resumes
+        all_texts = [job_desc] + texts
 
-        # TO DO: embeddings
-        # TO DO: compute cosine similarities // sims = [...]
+        # embed everything in one go (model only loads once)
+        embeddings = embed_text(all_texts)
 
-        # dummy data
+        # split job embedding vs. resume embeddings
+        job_emb     = embeddings[0].reshape(1, -1)   # shape (1, dim)
+        resume_embs = embeddings[1:]                # shape (n_resumes, dim)
+
+        # compute cosine similarities (returns array of shape (1, n_resumes))
+        sims = cosine_similarity(job_emb, resume_embs)[0]
+
+        # build DataFrame and sort candidates
         df = pd.DataFrame({
             "Candidate": ids,
-            "Similarity": [0.0 for _ in ids],
+            "Similarity": sims,
         }).sort_values("Similarity", ascending=False)
 
         # display top candidates
