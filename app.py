@@ -4,7 +4,7 @@ import PyPDF2
 import re
 
 from embeddings import embed_text
-from preprocessing import preprocess_for_embedding
+from preprocessing import resume_to_sections
 from sklearn.metrics.pairwise import cosine_similarity
 
 # ---- Page config ----
@@ -74,29 +74,43 @@ if st.sidebar.button("Run Recommendation"):
     elif not uploaded_files:
         st.sidebar.error("Please input at least one resume.")
     else: 
-        # preprocess resumes
-        processed_texts = [preprocess_for_embedding(t) for t in texts]
 
-        print(processed_texts)
+        # job desc embedding
+        jd_embed = embed_text([job_desc])[0]
 
-        # build combined list: job_desc, then processed resumes
-        all_texts = [job_desc] + processed_texts
+        # resume embeddings
+        results = []
+        for name, resume_text in zip(ids, texts):
+            # new section-level approach
+            sections = resume_to_sections(resume_text)
+            if not sections:
+                continue
 
-        # embed everything in one go (model only loads once)
-        embeddings = embed_text(all_texts)
+            # MODIFIABLE WEIGHTS
+            weights = {
+                "experience":            2.0,
+                "projects":              1.5,
+                "skills":                1.0,
+                "education":             1.0,
+            }
+            # MODIFIABLE WEIGHTS
 
-        # split job embedding vs. resume embeddings
-        job_emb     = embeddings[0].reshape(1, -1)   # shape (1, dim)
-        resume_embs = embeddings[1:]                # shape (n_resumes, dim)
+            texts, ws = [], []
+            for sec_name, text in sections.items():
+                w = weights.get(sec_name, 1.0)
+                if text and w > 0:
+                    texts.append(text)
+                    ws.append(w)
 
-        # compute cosine similarities (returns array of shape (1, n_resumes))
-        sims = cosine_similarity(job_emb, resume_embs)[0]
+            embeds = embed_text(texts)
 
-        # build DataFrame and sort candidates
-        df = pd.DataFrame({
-            "Candidate": ids,
-            "Similarity": sims,
-        }).sort_values("Similarity", ascending=False)
+            # compute weighted average
+            sims = cosine_similarity([jd_embed], embeds)[0]
+            weighted_score = float((sims * ws).sum() / sum(ws))
+            results.append((name, weighted_score))
+
+        # rank by score descending
+        df = pd.DataFrame(results, columns=["name","weighted_score"]).sort_values("weighted_score", ascending=False)
 
         # display top candidates
         top_k = min(10, len(df))

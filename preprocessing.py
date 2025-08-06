@@ -43,16 +43,9 @@ def extract_sections(text: str) -> dict[str, str]:
     sections[current] = "\n".join(buffer).strip()
     return sections
 
-def preprocess_for_embedding(raw_resume: str) -> str:
+def resume_to_sections(raw_resume: str) -> dict[str,str]:
     # clean text
     clean = clean_text(raw_resume)
     # extract sections
     secs  = extract_sections(clean)
-    # 3. Reconstruct a weighted text blob
-    weighted = (
-        (secs.get("professional experience", "") * 2 or secs.get("experience", "") * 2 or secs.get("work experience", "") * 2)
-      + (secs.get("projects", "")                     )
-      + (secs.get("skills", "")                       )
-      + (secs.get("education", "")                    )
-    )
-    return weighted or clean  # fallback to full clean text
+    return secs
