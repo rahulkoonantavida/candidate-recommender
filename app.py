@@ -4,6 +4,7 @@ import PyPDF2
 import re
 
 from embeddings import embed_text
+from preprocessing import preprocess_for_embedding
 from sklearn.metrics.pairwise import cosine_similarity
 
 # ---- Page config ----
@@ -47,7 +48,7 @@ if input_method == "Upload PDFs/TXTs":
             ids.append(f.name)
 
 else:  # paste as text
-    paste = st.sidebar.text_area(
+    uploaded_files = st.sidebar.text_area(
         "Paste all resumes here",
         placeholder=(
             "Paste each resume one after another, and separate them with a line\n"
@@ -56,9 +57,9 @@ else:  # paste as text
         ),
         height=300,
     )
-    if paste:
+    if uploaded_files:
         # split on lines that are exactly '---'
-        parts = [p.strip() for p in re.split(r"(?m)^\-\-\-$", paste) if p.strip()]
+        parts = [p.strip() for p in re.split(r"(?m)^\-\-\-$", uploaded_files) if p.strip()]
         for i, part in enumerate(parts, start=1):
             # parse the first line as the candidate name
             lines = part.splitlines()
@@ -71,25 +72,15 @@ if st.sidebar.button("Run Recommendation"):
     if not job_desc:
         st.sidebar.error("Please enter a job description.")
     elif not uploaded_files:
-        st.sidebar.error("Please upload at least one resume.")
-    else:
-        # extract text from each resume
-        texts = []
-        ids = []
-        for f in uploaded_files:
-            raw = ""
-            if f.type == "application/pdf":
-                # TO DO: extract text
-                reader = PyPDF2.PdfReader(f)
-                for page in reader.pages:
-                    raw += page.extract_text() or ""
-            else:
-                raw = f.read().decode("utf-8")
-            texts.append(raw)
-            ids.append(f.name)
-            
-        # build combined list: job_desc, then all resumes
-        all_texts = [job_desc] + texts
+        st.sidebar.error("Please input at least one resume.")
+    else: 
+        # preprocess resumes
+        processed_texts = [preprocess_for_embedding(t) for t in texts]
+
+        print(processed_texts)
+
+        # build combined list: job_desc, then processed resumes
+        all_texts = [job_desc] + processed_texts
 
         # embed everything in one go (model only loads once)
         embeddings = embed_text(all_texts)
