@@ -4,7 +4,7 @@ import PyPDF2
 import re
 
 from embeddings import embed_text
-from preprocessing import resume_to_sections
+from preprocessing import clean_text
 from sklearn.metrics.pairwise import cosine_similarity
 
 # ---- Page config ----
@@ -72,45 +72,40 @@ if st.sidebar.button("Run Recommendation"):
     if not job_desc:
         st.sidebar.error("Please enter a job description.")
     elif not uploaded_files:
-        st.sidebar.error("Please input at least one resume.")
-    else: 
+        st.sidebar.error("Please upload at least one resume.")
+    else:
+        # extract text from each resume
+        texts = []
+        ids = []
+        for f in uploaded_files:
+            raw = ""
+            if f.type == "application/pdf":
+                reader = PyPDF2.PdfReader(f)
+                for page in reader.pages:
+                    raw += page.extract_text() or ""
+            else:
+                raw = f.read().decode("utf-8")
+            texts.append(clean_text(raw))
+            ids.append(f.name)
+            
+        # build combined list: job_desc, then all resumes
+        all_texts = [clean_text(job_desc)] + texts
 
-        # job desc embedding
-        jd_embed = embed_text([job_desc])[0]
+        # embed everything in one go (model only loads once)
+        embeddings = embed_text(all_texts)
 
-        # resume embeddings
-        results = []
-        for name, resume_text in zip(ids, texts):
-            # new section-level approach
-            sections = resume_to_sections(resume_text)
-            if not sections:
-                continue
+        # split job embedding vs. resume embeddings
+        job_emb     = embeddings[0].reshape(1, -1)   # shape (1, dim)
+        resume_embs = embeddings[1:]                # shape (n_resumes, dim)
 
-            # MODIFIABLE WEIGHTS
-            weights = {
-                "experience":            2.0,
-                "projects":              1.5,
-                "skills":                1.0,
-                "education":             1.0,
-            }
-            # MODIFIABLE WEIGHTS
+        # compute cosine similarities (returns array of shape (1, n_resumes))
+        sims = cosine_similarity(job_emb, resume_embs)[0]
 
-            texts, ws = [], []
-            for sec_name, text in sections.items():
-                w = weights.get(sec_name, 1.0)
-                if text and w > 0:
-                    texts.append(text)
-                    ws.append(w)
-
-            embeds = embed_text(texts)
-
-            # compute weighted average
-            sims = cosine_similarity([jd_embed], embeds)[0]
-            weighted_score = float((sims * ws).sum() / sum(ws))
-            results.append((name, weighted_score))
-
-        # rank by score descending
-        df = pd.DataFrame(results, columns=["name","weighted_score"]).sort_values("weighted_score", ascending=False)
+        # build DataFrame and sort candidates
+        df = pd.DataFrame({
+            "Candidate": ids,
+            "Similarity": sims,
+        }).sort_values("Similarity", ascending=False)
 
         # display top candidates
         top_k = min(10, len(df))

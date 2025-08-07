@@ -1,9 +1,7 @@
 import re
-
-SECTION_HEADERS = [
-    "experience", "work experience", "professional experience",
-    "education", "skills", "projects", "certifications",
-]
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 
 def clean_text(raw: str) -> str:
     # Remove URLs
@@ -16,36 +14,12 @@ def clean_text(raw: str) -> str:
     text = re.sub(r'Page \d+ of \d+', '', text, flags=re.IGNORECASE)
     # Squash multiple blank lines
     text = re.sub(r'\n{2,}', '\n\n', text)
-    return text.strip()
-
-def extract_sections(text: str) -> dict[str, str]:
-    """
-    Returns a dict mapping section header → section text.
-    Unrecognized text before the first known header goes under 'header'.
-    """
-    lines = text.splitlines()
-    sections = {}
-    current = "header"
-    buffer = []
-
-    for line in lines:
-        lstr = line.strip().lower()
-        if lstr in SECTION_HEADERS:
-            # save the previous
-            sections[current] = "\n".join(buffer).strip()
-            current = lstr
-            # save all forms of experience as "experience"
-            if current == "work experience" or "professional experience":
-                current = "experience"
-            buffer = []
-        else:
-            buffer.append(line)
-    sections[current] = "\n".join(buffer).strip()
-    return sections
-
-def resume_to_sections(raw_resume: str) -> dict[str,str]:
-    # clean text
-    clean = clean_text(raw_resume)
-    # extract sections
-    secs  = extract_sections(clean)
-    return secs
+    # Tokenize the text
+    words = word_tokenize(text)
+    # Get English stop words
+    stop_words = set(stopwords.words('english'))
+    # Filter out stop words
+    filtered_words = [word for word in words if word.lower() not in stop_words]
+    # Join the filtered words back into a sentence
+    clean_text = " ".join(filtered_words)
+    return clean_text
