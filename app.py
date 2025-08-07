@@ -85,6 +85,7 @@ if st.sidebar.button("Run Recommendation"):
                     raw += page.extract_text() or ""
             else:
                 raw = f.read().decode("utf-8")
+            # clean_text removes noise (stop words, emails, phone numbers, etc...)
             texts.append(clean_text(raw))
             ids.append(f.name)
             
@@ -92,7 +93,8 @@ if st.sidebar.button("Run Recommendation"):
         all_texts = [clean_text(job_desc)] + texts
 
         # embed everything in one go (model only loads once)
-        embeddings = embed_text(all_texts)
+        with st.spinner("Computing embeddings…"):
+            embeddings = embed_text(all_texts)
 
         # split job embedding vs. resume embeddings
         job_emb     = embeddings[0].reshape(1, -1)   # shape (1, dim)
