@@ -2,7 +2,9 @@ import streamlit as st
 import pandas as pd
 import PyPDF2
 import re
+import openai
 
+from summary import summarize_fit
 from embeddings import embed_text
 from preprocessing import clean_text
 from sklearn.metrics.pairwise import cosine_similarity
@@ -15,6 +17,16 @@ st.title("Candidate Recommendation Engine")
 
 # ---- Sidebar inputs ----
 st.sidebar.header("Inputs")
+
+openai_api_key = st.sidebar.text_input(
+    "🔑 OpenAI API Key (optional for LLM summaries)",
+    type="password",
+    placeholder="sk-…",
+)
+
+if openai_api_key:
+    openai.api_key = openai_api_key
+
 job_desc = st.sidebar.text_area(
     "Job Description",
     placeholder="Paste the job description here...",
@@ -28,6 +40,7 @@ input_method = st.sidebar.radio(
 )
 
 texts, ids = [], []
+fulltexts = []
 
 if input_method == "Upload PDFs/TXTs":
     uploaded_files = st.sidebar.file_uploader(
@@ -85,6 +98,7 @@ if st.sidebar.button("Run Recommendation"):
                     raw += page.extract_text() or ""
             else:
                 raw = f.read().decode("utf-8")
+            fulltexts.append(raw)
             # clean_text removes noise (stop words, emails, phone numbers, etc...)
             texts.append(clean_text(raw))
             ids.append(f.name)
@@ -114,7 +128,18 @@ if st.sidebar.button("Run Recommendation"):
         st.subheader(f"Top {top_k} Candidates")
         st.table(df.head(top_k))
 
-        # BONUS: OpenAI API call to GPT???
+        # retrieve dict of ids and full resume texts
+        id2text = dict(zip(ids, fulltexts))
+        if openai_api_key:
+            st.markdown("### 🤖 AI-Generated Summaries")
+            for _, r in df.head(3).iterrows():
+                cid = r["Candidate"]
+                ctext = id2text[cid]
+                with st.spinner(f"Summarizing fit for {cid}…"):
+                    summary = summarize_fit(job_desc, ctext)
+                st.write(f"**{cid}:** {summary}")
+        else:
+            st.info("Enter your OpenAI API key to see AI-generated summaries.")
 
 else:
     st.sidebar.info("Fill in the inputs and click **Run Recommendation**")
