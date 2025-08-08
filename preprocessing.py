@@ -38,4 +38,5 @@ def clean_text(raw: str) -> str:
     filtered_words = [word for word in words if word.lower() not in stop_words]
     # Join the filtered words back into a sentence
     clean_text = " ".join(filtered_words)
+    
     return clean_text

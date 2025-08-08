@@ -21,4 +21,5 @@ def embed_text(texts: list[str], batch_size: int = 32) -> list[list[float]]:
     """
     model = load_model()
     embeddings = model.encode(texts, batch_size=batch_size, show_progress_bar=True, normalize_embeddings=True)
+    
     return embeddings
