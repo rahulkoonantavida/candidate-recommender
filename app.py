@@ -1,3 +1,11 @@
+import nltk
+nltk.download('punkt')
+nltk.download('punkt_tab')
+nltk.download('stopwords')
+
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+
 import openai
 import streamlit as st
 import pandas as pd
@@ -62,7 +70,6 @@ if input_method == "Upload PDFs/TXTs":
                     raw += page.extract_text() or ""
             else:
                 raw = f.read().decode("utf-8")
-            fulltexts.append(raw)
             texts.append(clean_text(raw))
             ids.append(f.name)
 
@@ -88,7 +95,6 @@ else:  # paste as text
             txt = "\n".join(lines[1:]) if len(lines) > 1 else ""
             ids.append(name)
             texts.append(clean_text(txt))
-            fulltexts.append(txt)
 
 # MAIN APP FUNCTIONALITY
 # 1. compute embeddings for job description, and each resume
