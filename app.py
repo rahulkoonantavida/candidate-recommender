@@ -19,14 +19,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ---- Page config ----
 st.set_page_config(page_title="candidate-recommender", layout="wide", initial_sidebar_state="expanded")
 # ---- Title ----
-st.title("Candidate Recommendation Engine")
+st.title("Search for the Most Competitive Candidates!")
 
 # ---- Sidebar inputs ----
-st.sidebar.header("Inputs")
+st.sidebar.header("Enter Input Details:")
 
 # OPTIONAL OPENAI API KEY FOR LLM SUMMARIES
 openai_api_key = st.sidebar.text_input(
-    "🔑 OpenAI API Key (optional for LLM summaries)",
+    "🔑 OpenAI API Key (optional for AI summaries)",
     type="password",
     placeholder="sk-…",
 )
@@ -129,17 +129,31 @@ if st.sidebar.button("Run Recommendation"):
             "Similarity": sims,
         }).sort_values("Similarity", ascending=False)
 
-        # display top candidates
+        # define a function that returns a CSS style string for each cell
+        def color_similarity(val):
+            if val > 0.8:
+                color = "#2ecc71"   # dark green
+            elif val > 0.6:
+                color = "#a3e635"   # light green
+            elif val > 0.4:
+                color = "#facc15"   # yellow
+            else:
+                color = "#ef4444"   # red
+            return f'background-color: {color}; color: black;'
+
+        # display top-k
         top_k = min(10, len(df))
+        top_df = df.head(top_k)
+        styled = top_df.style.applymap(color_similarity, subset=["Similarity"])
         st.subheader(f"Top {top_k} Candidates")
-        st.table(df.head(top_k))
+        st.dataframe(styled, height=300)
 
         # retrieve dict of ids and full resume texts
         id2text = dict(zip(ids, fulltexts))
 
         # generate LLM summaries for top 3 candidates
         if openai_api_key:
-            st.markdown("### 🤖 AI-Generated Summaries for Top 3 Candidates")
+            st.markdown("AI-Generated Summaries for Top 3 Candidates")
             for _, r in df.head(3).iterrows():
                 cid = r["Candidate"]
                 ctext = id2text[cid]
